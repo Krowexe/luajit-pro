@@ -1,0 +1,54 @@
+name: Build luajit-pro Android 10 ARM64 (.so)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      NDK_VERSION: r25b
+      ANDROID_API: 29
+      ARCH_TRIPLE: aarch64-linux-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup NDK
+        uses: android-actions/setup-ndk@v2
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+
+      - name: Extract toolchain paths
+        run: |
+          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+          echo "CC=$TOOLCHAIN/${ARCH_TRIPLE}${ANDROID_API}-clang" >> $GITHUB_ENV
+          echo "CXX=$TOOLCHAIN/${ARCH_TRIPLE}${ANDROID_API}-clang++" >> $GITHUB_ENV
+          echo "AR=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
+          echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
+          echo "SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
+
+      - name: Compile sources to objects
+        run: |
+          mkdir -p build
+          SRCS=$(find src lua -type f \( -name "*.c" -o -name "*.cpp" \))
+
+          for f in $SRCS; do
+            if [[ $f == *.cpp ]]; then
+              $CXX -c $f -fPIC --sysroot $SYSROOT -I./src -I./lua -o build/$(basename $f).o
+            else
+              $CC -c $f -fPIC --sysroot $SYSROOT -I./src -I./lua -o build/$(basename $f).o
+            fi
+          done
+
+      - name: Link shared library
+        run: |
+          mkdir -p output
+          $CXX -shared build/*.o -o output/libluajit-pro.so --sysroot $SYSROOT
+
+      - name: Upload .so
+        uses: actions/upload-artifact@v3
+        with:
+          name: luajit-pro-android10-arm64-so
+          path: output/libluajit-pro.so
