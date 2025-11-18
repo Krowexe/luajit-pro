@@ -14,32 +14,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java
+      # Serve Java 17 per evitare l'errore
+      - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
 
-      - name: Set up Android SDK
+      # Installa solo l’SDK base, senza forzare nuovi commandline tools
+      - name: Set up basic Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            cmdline-tools;latest
-            ndk;${{ env.NDK_VERSION }}
+          packages: platform-tools
 
+      # Adesso possiamo installare il NDK con sdkmanager senza rompere nulla
       - name: Install NDK
         run: |
-          yes | sdkmanager "ndk;${{ env.NDK_VERSION }}"
+          yes | sdkmanager --install "ndk;${NDK_VERSION}"
 
       - name: Configure toolchain
         run: |
-          TOOLCHAIN="$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          TOOLCHAIN="$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin"
           echo "CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
           echo "CXX=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
           echo "AR=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
           echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
-          echo "SYSROOT=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
+          echo "SYSROOT=$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
       - name: Compile sources
         run: |
@@ -47,18 +47,18 @@ jobs:
           SRCS=$(find src lua -type f \( -name "*.c" -o -name "*.cpp" \))
           for f in $SRCS; do
             if [[ $f == *.cpp ]]; then
-              $CXX -c $f -fPIC --sysroot $SYSROOT -I./src -I./lua -o build/$(basename $f).o
+              $CXX -c "$f" -fPIC --sysroot "$SYSROOT" -I./src -I./lua -o build/$(basename "$f").o
             else
-              $CC -c $f -fPIC --sysroot $SYSROOT -I./src -I./lua -o build/$(basename $f).o
+              $CC -c "$f" -fPIC --sysroot "$SYSROOT" -I./src -I./lua -o build/$(basename "$f").o
             fi
           done
 
-      - name: Link shared library
+      - name: Link .so
         run: |
           mkdir -p output
-          $CXX -shared build/*.o -o output/libluajit-pro.so --sysroot $SYSROOT
+          $CXX -shared build/*.o -o output/libluajit-pro.so --sysroot "$SYSROOT"
 
-      - name: Upload artifact
+      - name: Upload .so
         uses: actions/upload-artifact@v4
         with:
           name: luajit-pro-android10-arm64-so
