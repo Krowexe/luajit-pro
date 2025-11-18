@@ -8,32 +8,40 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      NDK_VERSION: r25b
       ANDROID_API: 29
-      ARCH_TRIPLE: aarch64-linux-android
+      NDK_VERSION: "25.1.8937393"  # metti la versione che vuoi
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup NDK
-        uses: android-actions/setup-ndk@v2
+      - name: Set up Java
+        uses: actions/setup-java@v3
         with:
-          ndk-version: ${{ env.NDK_VERSION }}
+          distribution: temurin
+          java-version: 11
 
-      - name: Extract toolchain paths
+      - name: Set up Android SDK (incluso sdkmanager)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools, cmdline-tools;latest, ndk;${{ env.NDK_VERSION }}"
+
+      - name: Install NDK with sdkmanager
         run: |
-          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-          echo "CC=$TOOLCHAIN/${ARCH_TRIPLE}${ANDROID_API}-clang" >> $GITHUB_ENV
-          echo "CXX=$TOOLCHAIN/${ARCH_TRIPLE}${ANDROID_API}-clang++" >> $GITHUB_ENV
+          yes | sdkmanager "ndk;${{ env.NDK_VERSION }}"
+
+      - name: Configure toolchain
+        run: |
+          TOOLCHAIN="$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "CC=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
+          echo "CXX=$TOOLCHAIN/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
           echo "AR=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
           echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
-          echo "SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
+          echo "SYSROOT=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
       - name: Compile sources to objects
         run: |
           mkdir -p build
           SRCS=$(find src lua -type f \( -name "*.c" -o -name "*.cpp" \))
-
           for f in $SRCS; do
             if [[ $f == *.cpp ]]; then
               $CXX -c $f -fPIC --sysroot $SYSROOT -I./src -I./lua -o build/$(basename $f).o
@@ -42,13 +50,13 @@ jobs:
             fi
           done
 
-      - name: Link shared library
+      - name: Link shared library (.so)
         run: |
           mkdir -p output
           $CXX -shared build/*.o -o output/libluajit-pro.so --sysroot $SYSROOT
 
       - name: Upload .so
-        uses: actions/upload-artifact@v4
+        uses: actions/[email protected]
         with:
           name: luajit-pro-android10-arm64-so
           path: output/libluajit-pro.so
