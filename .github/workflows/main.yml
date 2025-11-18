@@ -48,7 +48,7 @@ jobs:
           $CXX -shared build/*.o -o output/libluajit-pro.so --sysroot $SYSROOT
 
       - name: Upload .so
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: luajit-pro-android10-arm64-so
           path: output/libluajit-pro.so
