@@ -9,7 +9,7 @@ jobs:
 
     env:
       ANDROID_API: 29
-      NDK_VERSION: "25.1.8937393"  # metti la versione che vuoi
+      NDK_VERSION: "25.1.8937393"
 
     steps:
       - uses: actions/checkout@v4
@@ -20,12 +20,15 @@ jobs:
           distribution: temurin
           java-version: 11
 
-      - name: Set up Android SDK (incluso sdkmanager)
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools, cmdline-tools;latest, ndk;${{ env.NDK_VERSION }}"
+          packages: |
+            platform-tools
+            cmdline-tools;latest
+            ndk;${{ env.NDK_VERSION }}
 
-      - name: Install NDK with sdkmanager
+      - name: Install NDK
         run: |
           yes | sdkmanager "ndk;${{ env.NDK_VERSION }}"
 
@@ -38,7 +41,7 @@ jobs:
           echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
           echo "SYSROOT=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot" >> $GITHUB_ENV
 
-      - name: Compile sources to objects
+      - name: Compile sources
         run: |
           mkdir -p build
           SRCS=$(find src lua -type f \( -name "*.c" -o -name "*.cpp" \))
@@ -50,13 +53,13 @@ jobs:
             fi
           done
 
-      - name: Link shared library (.so)
+      - name: Link shared library
         run: |
           mkdir -p output
           $CXX -shared build/*.o -o output/libluajit-pro.so --sysroot $SYSROOT
 
-      - name: Upload .so
-        uses: actions/[email protected]
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: luajit-pro-android10-arm64-so
           path: output/libluajit-pro.so
